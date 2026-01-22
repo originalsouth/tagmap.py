@@ -21,10 +21,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install build dependencies
-      run: pip install pybind11
+      run: pip install pybind11 pytest
     - name: Build and install package
       run: pip install -e .
-    - name: Run tagmap.py
+    - name: Run tests
+      run: pytest test_tagmap.py -v
+    - name: Run demo script
       run: python tagmap.py
-    - name: Run tagmap_bench.py
+    - name: Run benchmark
       run: python tagmap_bench.py
