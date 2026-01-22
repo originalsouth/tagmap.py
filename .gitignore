@@ -1,0 +1,30 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.pyc
+__pycache__/
+*.so
+*.o
+*.a
+
+# Development
+.venv/
+venv/
+.env
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Package build
+tagmap.cpython-*.so
