@@ -26,11 +26,15 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
-          {
-            echo 'notes<<EOF'
-            git log --pretty=format:"%h - %s (%an)" $(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.version }}^)..$(git describe --tags --abbrev=0) 2>/dev/null || echo "Initial release"
-            echo 'EOF'
-          } >> $GITHUB_OUTPUT
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.version }}^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            NOTES="Initial release"
+          else
+            NOTES=$(git log --pretty=format:"%h - %s (%an)" $PREVIOUS_TAG..${{ steps.tag_version.outputs.version }})
+          fi
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: actions/create-release@v1
