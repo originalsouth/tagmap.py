@@ -29,6 +29,8 @@ jobs:
       - name: Repair wheels with auditwheel
         run: |
           auditwheel repair dist/tagmap-*.whl -w dist/
+          # Remove the original non-manylinux wheel
+          rm dist/tagmap-*-linux_x86_64.whl
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
