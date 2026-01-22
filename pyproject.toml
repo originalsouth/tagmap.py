@@ -32,6 +32,3 @@ Repository = "https://github.com/originalsouth/tagmap.py"
 
 [tool.setuptools]
 packages = ["tagmap"]
-
-[tool.setuptools.extension-modules]
-tagmap = { sources = ["tagmap_pybind.cc"], include-dirs = ["."] }
