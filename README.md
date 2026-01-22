@@ -58,7 +58,3 @@ uv pip install -e .
 # Or build directly
 make
 ```
-
-## License
-
-[Your License Here]
