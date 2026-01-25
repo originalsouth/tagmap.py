@@ -63,7 +63,7 @@ print("popitem ->", k, sorted(v))
 show(m, "after pops")
 
 print("\nerase / discard:")
-m.erase("alice")
+m.erase("bob")
 m.discard("not-there")
 show(m, "after erase/discard")
 
