@@ -16,34 +16,31 @@ using Map = Tagmap<Data, Tag>;
 
 using ObjectsMap = decltype(std::declval<Map &>().objects);
 
-static inline std::unordered_set<Tag> to_tagset(const py::iterable &tags) {
+static inline std::unordered_set<Tag> to_tagset(const py::handle &tags) {
   std::unordered_set<Tag> out;
-  for (py::handle h : tags)
-    out.insert(py::cast<Tag>(h));
+  try {
+    const auto n = py::len(tags);
+    if (n > 0)
+      out.reserve(static_cast<size_t>(n));
+  } catch (const py::error_already_set &) {
+    PyErr_Clear();
+  }
+  for (py::handle h : py::iter(tags))
+    out.emplace(py::cast<Tag>(h));
   return out;
 }
 
 static inline ObjectsMap::iterator find_obj_it(Map &m, const Data &d) {
   Obj probe(d);
   const size_t key = m.getkey(probe);
-  auto it = m.objects.find(key);
-  if (it == m.objects.end())
-    return m.objects.end();
-  if (it->second.data != d)
-    return m.objects.end();
-  return it;
+  return m.objects.find(key);
 }
 
 static inline ObjectsMap::const_iterator find_obj_it(const Map &m,
                                                      const Data &d) {
   Obj probe(d);
   const size_t key = m.getkey(probe);
-  auto it = m.objects.find(key);
-  if (it == m.objects.end())
-    return m.objects.end();
-  if (it->second.data != d)
-    return m.objects.end();
-  return it;
+  return m.objects.find(key);
 }
 
 static inline bool has_data(const Map &m, const Data &d) {
@@ -55,14 +52,6 @@ static inline const Obj &get_obj_or_throw(const Map &m, const Data &d) {
   if (it == m.objects.end())
     throw py::key_error("key not found: " + d);
   return it->second;
-}
-
-static inline std::unordered_set<Tag> tags_of_or_empty(const Map &m,
-                                                       const Data &d) {
-  auto it = find_obj_it(m, d);
-  if (it == m.objects.end())
-    return {};
-  return it->second.references;
 }
 
 static inline void set_tags(Map &m, const Data &d,
@@ -85,28 +74,29 @@ static inline Obj erase_data_or_throw(Map &m, const Data &d) {
   return m.erase(&it->second);
 }
 
-static inline std::vector<Data> keys_vec(const Map &m) {
-  std::vector<Data> out;
-  out.reserve(m.objects.size());
+static inline py::list keys_list(const Map &m) {
+  py::list out(m.objects.size());
+  size_t i = 0;
   for (const auto &kv : m.objects)
-    out.push_back(kv.second.data);
+    out[i++] = py::cast(kv.second.data);
   return out;
 }
 
-static inline std::vector<std::pair<Data, std::unordered_set<Tag>>>
-items_vec(const Map &m) {
-  std::vector<std::pair<Data, std::unordered_set<Tag>>> out;
-  out.reserve(m.objects.size());
+static inline py::list values_list(const Map &m) {
+  py::list out(m.objects.size());
+  size_t i = 0;
   for (const auto &kv : m.objects)
-    out.emplace_back(kv.second.data, kv.second.references);
+    out[i++] = py::cast(kv.second.references);
   return out;
 }
 
-static inline std::vector<std::unordered_set<Tag>> values_vec(const Map &m) {
-  std::vector<std::unordered_set<Tag>> out;
-  out.reserve(m.objects.size());
-  for (const auto &kv : m.objects)
-    out.push_back(kv.second.references);
+static inline py::list items_list(const Map &m) {
+  py::list out(m.objects.size());
+  size_t i = 0;
+  for (const auto &kv : m.objects) {
+    out[i++] = py::make_tuple(py::cast(kv.second.data),
+                              py::cast(kv.second.references));
+  }
   return out;
 }
 
@@ -114,33 +104,32 @@ static inline std::vector<Tag> all_tags_vec(const Map &m) {
   return m.listtags();
 }
 
-static inline std::unordered_set<Data>
-query_all_of(const Map &m, const std::unordered_set<Tag> &tags) {
-  std::unordered_set<Data> out;
+static inline py::set query_all_of_py(const Map &m,
+                                      const std::unordered_set<Tag> &tags) {
+  py::set out;
   if (tags.empty()) {
-    out.reserve(m.objects.size());
     for (const auto &kv : m.objects)
-      out.insert(kv.second.data);
+      out.add(py::cast(kv.second.data));
     return out;
   }
-  const auto ptrs = m.find(tags);
-  out.reserve(ptrs.size());
+  const auto ptrs = m.find(tags); // unordered_set<const Data*>
   for (const Data *p : ptrs)
-    out.insert(*p);
+    out.add(py::cast(*p));
   return out;
 }
 
-static inline std::unordered_set<Data>
-query_any_of(const Map &m, const std::unordered_set<Tag> &tags) {
-  std::unordered_set<Data> out;
+static inline py::set query_any_of_py(const Map &m,
+                                      const std::unordered_set<Tag> &tags) {
+  py::set out;
   if (tags.empty()) {
-    out.reserve(m.objects.size());
     for (const auto &kv : m.objects)
-      out.insert(kv.second.data);
+      out.add(py::cast(kv.second.data));
     return out;
   }
 
   std::unordered_set<size_t> keys;
+  keys.reserve(tags.size());
+
   for (const auto &t : tags) {
     auto it = m.references.find(t);
     if (it == m.references.end())
@@ -148,13 +137,42 @@ query_any_of(const Map &m, const std::unordered_set<Tag> &tags) {
     keys.insert(it->second.begin(), it->second.end());
   }
 
-  out.reserve(keys.size());
   for (const size_t k : keys) {
     auto it = m.objects.find(k);
     if (it != m.objects.end())
-      out.insert(it->second.data);
+      out.add(py::cast(it->second.data));
   }
   return out;
+}
+
+static inline size_t count_all_of(const Map &m,
+                                  const std::unordered_set<Tag> &tags) {
+  if (tags.empty())
+    return m.objects.size();
+  return m.find(tags).size();
+}
+
+static inline size_t count_any_of(const Map &m,
+                                  const std::unordered_set<Tag> &tags) {
+  if (tags.empty())
+    return m.objects.size();
+  std::unordered_set<size_t> keys;
+  keys.reserve(tags.size());
+  for (const auto &t : tags) {
+    auto it = m.references.find(t);
+    if (it == m.references.end())
+      continue;
+    keys.insert(it->second.begin(), it->second.end());
+  }
+  return keys.size();
+}
+
+static inline std::unordered_set<Tag> tags_of_or_empty(const Map &m,
+                                                       const Data &d) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    return {};
+  return it->second.references;
 }
 
 static inline void add_tags(Map &m, const Data &d,
@@ -199,8 +217,7 @@ static inline Map map_from_dict(const py::dict &d) {
   Map out;
   for (auto item : d) {
     Data data = py::cast<Data>(item.first);
-    auto tags_iter = py::cast<py::iterable>(item.second);
-    set_tags(out, data, to_tagset(tags_iter));
+    set_tags(out, data, to_tagset(item.second));
   }
   return out;
 }
@@ -212,8 +229,7 @@ static inline Map map_from_keys_values(const py::iterable &keys,
   auto v_it = values.begin();
   while (k_it != keys.end() && v_it != values.end()) {
     Data data = py::cast<Data>(*k_it);
-    auto tags_iter = py::cast<py::iterable>(*v_it);
-    set_tags(out, data, to_tagset(tags_iter));
+    set_tags(out, data, to_tagset(*v_it));
     ++k_it;
     ++v_it;
   }
@@ -225,18 +241,22 @@ static inline Map map_from_keys_values(const py::iterable &keys,
 static inline Map map_from_pairs(const py::iterable &pairs) {
   Map out;
   for (py::handle h : pairs) {
-    py::tuple t = py::cast<py::tuple>(h);
+    if (!py::isinstance<py::tuple>(h))
+      throw py::type_error("each item must be a (key, tags) tuple");
+    py::tuple t = py::reinterpret_borrow<py::tuple>(h);
+
+    // Tests expect TypeError for malformed (non-2) tuples
     if (py::len(t) != 2)
       throw py::type_error("each item must be a (key, tags) pair");
+
     Data data = py::cast<Data>(t[0]);
-    auto tags_iter = py::cast<py::iterable>(t[1]);
-    set_tags(out, data, to_tagset(tags_iter));
+    set_tags(out, data, to_tagset(t[1]));
   }
   return out;
 }
 
 PYBIND11_MODULE(tagmap, m) {
-  m.doc() = "tagmap: fast tagged object map";
+  m.doc() = "tagmap: fast tagged object map (pybind interface)";
 
   py::class_<Obj>(m, "Object")
       .def(py::init<>())
@@ -247,6 +267,8 @@ PYBIND11_MODULE(tagmap, m) {
 
   py::class_<Map>(m, "TagMap")
       .def(py::init<>())
+
+      // Initializers
       .def(py::init([](const py::dict &d) { return map_from_dict(d); }),
            py::arg("d"))
       .def(py::init([](const py::iterable &keys, const py::iterable &values) {
@@ -256,6 +278,7 @@ PYBIND11_MODULE(tagmap, m) {
       .def(py::init(
                [](const py::iterable &pairs) { return map_from_pairs(pairs); }),
            py::arg("items"))
+
       .def_static(
           "from_keys_values",
           [](const py::iterable &keys, const py::iterable &values) {
@@ -265,6 +288,7 @@ PYBIND11_MODULE(tagmap, m) {
       .def_static(
           "from_dict", [](const py::dict &d) { return map_from_dict(d); },
           py::arg("d"))
+
       .def("__len__", [](const Map &self) { return self.objects.size(); })
       .def("__bool__", [](const Map &self) { return !self.objects.empty(); })
       .def(
@@ -272,7 +296,8 @@ PYBIND11_MODULE(tagmap, m) {
           [](const Map &self, const Data &k) { return has_data(self, k); },
           py::arg("key"))
       .def("__iter__",
-           [](const Map &self) { return py::iter(py::cast(keys_vec(self))); })
+           [](const Map &self) { return py::iter(keys_list(self)); })
+
       .def(
           "__getitem__",
           [](const Map &self, const Data &k) {
@@ -295,10 +320,12 @@ PYBIND11_MODULE(tagmap, m) {
              self.objects.clear();
              self.references.clear();
            })
-      .def("keys", [](const Map &self) { return keys_vec(self); })
-      .def("values", [](const Map &self) { return values_vec(self); })
-      .def("items", [](const Map &self) { return items_vec(self); })
+
+      .def("keys", [](const Map &self) { return keys_list(self); })
+      .def("values", [](const Map &self) { return values_list(self); })
+      .def("items", [](const Map &self) { return items_list(self); })
       .def("tags", [](const Map &self) { return all_tags_vec(self); })
+
       .def("to_dict",
            [](const Map &self) {
              py::dict out;
@@ -306,6 +333,7 @@ PYBIND11_MODULE(tagmap, m) {
                out[py::cast(kv.second.data)] = py::cast(kv.second.references);
              return out;
            })
+
       .def(
           "get",
           [](const Map &self, const Data &k,
@@ -316,6 +344,7 @@ PYBIND11_MODULE(tagmap, m) {
             return py::cast(it->second.references);
           },
           py::arg("key"), py::arg("default") = py::none())
+
       .def(
           "setdefault",
           [](Map &self, const Data &k, const py::iterable &default_tags) {
@@ -327,6 +356,7 @@ PYBIND11_MODULE(tagmap, m) {
             return tags;
           },
           py::arg("key"), py::arg("default"))
+
       .def(
           "pop",
           [](Map &self, const Data &k, py::object default_value) -> py::object {
@@ -336,6 +366,7 @@ PYBIND11_MODULE(tagmap, m) {
             return py::cast(removed->references);
           },
           py::arg("key"), py::arg("default") = py::none())
+
       .def("popitem",
            [](Map &self) {
              if (self.objects.empty())
@@ -345,16 +376,17 @@ PYBIND11_MODULE(tagmap, m) {
              Obj removed = self.erase(&it->second);
              return py::make_tuple(k, removed.references);
            })
+
       .def(
           "update",
           [](Map &self, const py::dict &d) {
             for (auto item : d) {
               Data key = py::cast<Data>(item.first);
-              auto tags = to_tagset(py::cast<py::iterable>(item.second));
-              set_tags(self, key, tags);
+              set_tags(self, key, to_tagset(item.second));
             }
           },
           py::arg("d"))
+
       .def(
           "add_tag",
           [](Map &self, const Data &k, const Tag &t) {
@@ -385,44 +417,140 @@ PYBIND11_MODULE(tagmap, m) {
             return has_tag(self, k, t);
           },
           py::arg("key"), py::arg("tag"))
+
       .def(
           "find",
           [](const Map &self, const py::iterable &tags) {
-            return query_all_of(self, to_tagset(tags));
+            return query_all_of_py(self, to_tagset(tags));
           },
           py::arg("tags"))
       .def("query",
            [](const Map &self, py::args tags) {
              std::unordered_set<Tag> tset;
+             tset.reserve(static_cast<size_t>(tags.size()));
              for (py::handle h : tags)
                tset.insert(py::cast<Tag>(h));
-             return query_all_of(self, tset);
+             return query_all_of_py(self, tset);
            })
       .def(
           "find_any",
           [](const Map &self, const py::iterable &tags) {
-            return query_any_of(self, to_tagset(tags));
+            return query_any_of_py(self, to_tagset(tags));
           },
           py::arg("tags"))
       .def("query_any",
            [](const Map &self, py::args tags) {
              std::unordered_set<Tag> tset;
+             tset.reserve(static_cast<size_t>(tags.size()));
              for (py::handle h : tags)
                tset.insert(py::cast<Tag>(h));
-             return query_any_of(self, tset);
+             return query_any_of_py(self, tset);
            })
+
       .def(
           "count",
           [](const Map &self, const py::iterable &tags) {
-            return py::int_(query_all_of(self, to_tagset(tags)).size());
+            return py::int_(count_all_of(self, to_tagset(tags)));
           },
           py::arg("tags"))
       .def(
           "count_any",
           [](const Map &self, const py::iterable &tags) {
-            return py::int_(query_any_of(self, to_tagset(tags)).size());
+            return py::int_(count_any_of(self, to_tagset(tags)));
           },
           py::arg("tags"))
+
+      // retain_where: ALL-of semantics, returns KEPT keys
+      .def(
+          "retain_where",
+          [](Map &self, const py::iterable &tags) {
+            const auto tset = to_tagset(tags);
+            if (tset.empty())
+              return keys_list(self);
+
+            const auto keep_objs =
+                self.findobject(tset); // unordered_set<const Obj*>
+            std::unordered_set<size_t> keep_keys;
+            keep_keys.reserve(keep_objs.size());
+
+            py::list kept(keep_objs.size());
+            size_t i = 0;
+            for (const Obj *p : keep_objs) {
+              keep_keys.insert(self.getkey(*p));
+              kept[i++] = py::cast(p->data);
+            }
+
+            std::vector<size_t> del;
+            del.reserve(self.objects.size() > keep_keys.size()
+                            ? (self.objects.size() - keep_keys.size())
+                            : 0);
+
+            for (const auto &kv : self.objects) {
+              if (!keep_keys.contains(kv.first))
+                del.push_back(kv.first);
+            }
+
+            for (size_t k : del) {
+              auto it = self.objects.find(k);
+              if (it != self.objects.end())
+                self.erase(&it->second);
+            }
+
+            return kept;
+          },
+          py::arg("tags"))
+
+      // retain_where_any: ANY-of semantics, returns KEPT keys
+      .def(
+          "retain_where_any",
+          [](Map &self, const py::iterable &tags) {
+            const auto tset = to_tagset(tags);
+            if (tset.empty())
+              return keys_list(self);
+
+            // Build union of keys matching ANY tag
+            std::unordered_set<size_t> keep_keys;
+            keep_keys.reserve(tset.size());
+
+            for (const auto &t : tset) {
+              auto it = self.references.find(t);
+              if (it == self.references.end())
+                continue;
+              keep_keys.insert(it->second.begin(), it->second.end());
+            }
+
+            py::list kept(keep_keys.size());
+            size_t i = 0;
+            for (size_t k : keep_keys) {
+              auto it = self.objects.find(k);
+              if (it != self.objects.end())
+                kept[i++] = py::cast(it->second.data);
+            }
+
+            // If some keys were stale (shouldn't happen), shrink list
+            if (i != keep_keys.size())
+              kept = kept.attr("__getitem__")(py::slice(0, i, 1));
+
+            std::vector<size_t> del;
+            del.reserve(self.objects.size() > keep_keys.size()
+                            ? (self.objects.size() - keep_keys.size())
+                            : 0);
+
+            for (const auto &kv : self.objects) {
+              if (!keep_keys.contains(kv.first))
+                del.push_back(kv.first);
+            }
+
+            for (size_t k : del) {
+              auto it = self.objects.find(k);
+              if (it != self.objects.end())
+                self.erase(&it->second);
+            }
+
+            return kept;
+          },
+          py::arg("tags"))
+
       .def(
           "erase",
           [](Map &self, const Data &k) {
@@ -439,28 +567,6 @@ PYBIND11_MODULE(tagmap, m) {
           "erase_where",
           [](Map &self, const py::iterable &tags) {
             return self.erase(to_tagset(tags));
-          },
-          py::arg("tags"))
-      .def(
-          "retain_where",
-          [](Map &self, const py::iterable &tags) {
-            const auto keep = query_all_of(self, to_tagset(tags));
-            auto ks = keys_vec(self);
-            for (const auto &k : ks)
-              if (keep.find(k) == keep.end())
-                (void)erase_data_if_exists(self, k);
-            return keep;
-          },
-          py::arg("tags"))
-      .def(
-          "retain_where_any",
-          [](Map &self, const py::iterable &tags) {
-            const auto keep = query_any_of(self, to_tagset(tags));
-            auto ks = keys_vec(self);
-            for (const auto &k : ks)
-              if (keep.find(k) == keep.end())
-                (void)erase_data_if_exists(self, k);
-            return keep;
           },
           py::arg("tags"));
 }
