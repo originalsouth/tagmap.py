@@ -3,9 +3,9 @@
 
 #include "tagmap/tagmap.h"
 
+#include <optional>
 #include <string>
 #include <unordered_set>
-#include <vector>
 
 namespace py = pybind11;
 
@@ -14,6 +14,8 @@ using Data = std::string;
 using Obj = Object<Data, Tag>;
 using Map = Tagmap<Data, Tag>;
 
+using ObjectsMap = decltype(std::declval<Map &>().objects);
+
 static inline std::unordered_set<Tag> to_tagset(const py::iterable &tags) {
   std::unordered_set<Tag> out;
   for (py::handle h : tags)
@@ -21,27 +23,46 @@ static inline std::unordered_set<Tag> to_tagset(const py::iterable &tags) {
   return out;
 }
 
-static inline bool has_data(const Map &m, const Data &d) {
+static inline ObjectsMap::iterator find_obj_it(Map &m, const Data &d) {
   Obj probe(d);
-  const size_t k = m.getkey(probe);
-  auto it = m.objects.find(k);
-  return it != m.objects.end() && it->second.data == d;
+  const size_t key = m.getkey(probe);
+  auto it = m.objects.find(key);
+  if (it == m.objects.end())
+    return m.objects.end();
+  if (it->second.data != d)
+    return m.objects.end();
+  return it;
+}
+
+static inline ObjectsMap::const_iterator find_obj_it(const Map &m,
+                                                     const Data &d) {
+  Obj probe(d);
+  const size_t key = m.getkey(probe);
+  auto it = m.objects.find(key);
+  if (it == m.objects.end())
+    return m.objects.end();
+  if (it->second.data != d)
+    return m.objects.end();
+  return it;
+}
+
+static inline bool has_data(const Map &m, const Data &d) {
+  return find_obj_it(m, d) != m.objects.end();
 }
 
 static inline const Obj &get_obj_or_throw(const Map &m, const Data &d) {
-  Obj probe(d);
-  const size_t k = m.getkey(probe);
-  auto it = m.objects.find(k);
-  if (it == m.objects.end() || it->second.data != d)
-    throw py::key_error(d);
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    throw py::key_error("key not found: " + d);
   return it->second;
 }
 
 static inline std::unordered_set<Tag> tags_of_or_empty(const Map &m,
                                                        const Data &d) {
-  if (!has_data(m, d))
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
     return {};
-  return get_obj_or_throw(m, d).references;
+  return it->second.references;
 }
 
 static inline void set_tags(Map &m, const Data &d,
@@ -49,11 +70,19 @@ static inline void set_tags(Map &m, const Data &d,
   m.insert(d, tags);
 }
 
-static inline bool erase_key_if_exists(Map &m, const Data &d) {
-  if (!has_data(m, d))
-    return false;
-  (void)m.erase(&d);
-  return true;
+static inline std::optional<Obj> erase_data_if_exists(Map &m, const Data &d) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    return std::nullopt;
+  Obj removed = m.erase(&it->second);
+  return removed;
+}
+
+static inline Obj erase_data_or_throw(Map &m, const Data &d) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    throw py::key_error("key not found: " + d);
+  return m.erase(&it->second);
 }
 
 static inline std::vector<Data> keys_vec(const Map &m) {
@@ -61,14 +90,6 @@ static inline std::vector<Data> keys_vec(const Map &m) {
   out.reserve(m.objects.size());
   for (const auto &kv : m.objects)
     out.push_back(kv.second.data);
-  return out;
-}
-
-static inline std::vector<std::unordered_set<Tag>> values_vec(const Map &m) {
-  std::vector<std::unordered_set<Tag>> out;
-  out.reserve(m.objects.size());
-  for (const auto &kv : m.objects)
-    out.push_back(kv.second.references);
   return out;
 }
 
@@ -81,39 +102,54 @@ items_vec(const Map &m) {
   return out;
 }
 
-static inline std::unordered_set<Data> all_data_set(const Map &m) {
-  std::unordered_set<Data> out;
+static inline std::vector<std::unordered_set<Tag>> values_vec(const Map &m) {
+  std::vector<std::unordered_set<Tag>> out;
   out.reserve(m.objects.size());
   for (const auto &kv : m.objects)
-    out.insert(kv.second.data);
+    out.push_back(kv.second.references);
   return out;
+}
+
+static inline std::vector<Tag> all_tags_vec(const Map &m) {
+  return m.listtags();
 }
 
 static inline std::unordered_set<Data>
 query_all_of(const Map &m, const std::unordered_set<Tag> &tags) {
-  if (tags.empty())
-    return all_data_set(m);
-  auto s = m.find(tags);
   std::unordered_set<Data> out;
-  out.reserve(s.size());
-  for (const Data *p : s)
+  if (tags.empty()) {
+    out.reserve(m.objects.size());
+    for (const auto &kv : m.objects)
+      out.insert(kv.second.data);
+    return out;
+  }
+  const auto ptrs = m.find(tags);
+  out.reserve(ptrs.size());
+  for (const Data *p : ptrs)
     out.insert(*p);
   return out;
 }
 
 static inline std::unordered_set<Data>
 query_any_of(const Map &m, const std::unordered_set<Tag> &tags) {
-  if (tags.empty())
-    return all_data_set(m);
+  std::unordered_set<Data> out;
+  if (tags.empty()) {
+    out.reserve(m.objects.size());
+    for (const auto &kv : m.objects)
+      out.insert(kv.second.data);
+    return out;
+  }
+
   std::unordered_set<size_t> keys;
   for (const auto &t : tags) {
     auto it = m.references.find(t);
-    if (it != m.references.end())
-      keys.insert(it->second.begin(), it->second.end());
+    if (it == m.references.end())
+      continue;
+    keys.insert(it->second.begin(), it->second.end());
   }
-  std::unordered_set<Data> out;
+
   out.reserve(keys.size());
-  for (size_t k : keys) {
+  for (const size_t k : keys) {
     auto it = m.objects.find(k);
     if (it != m.objects.end())
       out.insert(it->second.data);
@@ -121,321 +157,310 @@ query_any_of(const Map &m, const std::unordered_set<Tag> &tags) {
   return out;
 }
 
-static inline std::unordered_set<Data>
-retain_where_all_of(Map &m, const std::unordered_set<Tag> &tags) {
-  auto keep = query_all_of(m, tags);
-  auto ks = keys_vec(m);
-  for (const auto &k : ks)
-    if (keep.find(k) == keep.end())
-      (void)m.erase(&k);
-  return keep;
+static inline void add_tags(Map &m, const Data &d,
+                            const std::unordered_set<Tag> &more) {
+  auto cur = tags_of_or_empty(m, d);
+  cur.insert(more.begin(), more.end());
+  set_tags(m, d, cur);
 }
 
-static inline std::unordered_set<Data>
-retain_where_any_of(Map &m, const std::unordered_set<Tag> &tags) {
-  auto keep = query_any_of(m, tags);
-  auto ks = keys_vec(m);
-  for (const auto &k : ks)
-    if (keep.find(k) == keep.end())
-      (void)m.erase(&k);
-  return keep;
+static inline bool has_tag(const Map &m, const Data &d, const Tag &t) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    return false;
+  return it->second.references.find(t) != it->second.references.end();
+}
+
+static inline void remove_tag_or_throw(Map &m, const Data &d, const Tag &t) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    throw py::key_error("key not found: " + d);
+  auto tags = it->second.references;
+  auto tit = tags.find(t);
+  if (tit == tags.end())
+    throw py::key_error("tag not found: " + t);
+  tags.erase(tit);
+  set_tags(m, d, tags);
+}
+
+static inline void discard_tag(Map &m, const Data &d, const Tag &t) {
+  auto it = find_obj_it(m, d);
+  if (it == m.objects.end())
+    return;
+  auto tags = it->second.references;
+  auto tit = tags.find(t);
+  if (tit == tags.end())
+    return;
+  tags.erase(tit);
+  set_tags(m, d, tags);
+}
+
+static inline Map map_from_dict(const py::dict &d) {
+  Map out;
+  for (auto item : d) {
+    Data data = py::cast<Data>(item.first);
+    auto tags_iter = py::cast<py::iterable>(item.second);
+    set_tags(out, data, to_tagset(tags_iter));
+  }
+  return out;
+}
+
+static inline Map map_from_keys_values(const py::iterable &keys,
+                                       const py::iterable &values) {
+  Map out;
+  auto k_it = keys.begin();
+  auto v_it = values.begin();
+  while (k_it != keys.end() && v_it != values.end()) {
+    Data data = py::cast<Data>(*k_it);
+    auto tags_iter = py::cast<py::iterable>(*v_it);
+    set_tags(out, data, to_tagset(tags_iter));
+    ++k_it;
+    ++v_it;
+  }
+  if (k_it != keys.end() || v_it != values.end())
+    throw py::value_error("keys and values must have equal length");
+  return out;
+}
+
+static inline Map map_from_pairs(const py::iterable &pairs) {
+  Map out;
+  for (py::handle h : pairs) {
+    py::tuple t = py::cast<py::tuple>(h);
+    if (py::len(t) != 2)
+      throw py::type_error("each item must be a (key, tags) pair");
+    Data data = py::cast<Data>(t[0]);
+    auto tags_iter = py::cast<py::iterable>(t[1]);
+    set_tags(out, data, to_tagset(tags_iter));
+  }
+  return out;
 }
 
 PYBIND11_MODULE(tagmap, m) {
-  m.doc() = "Pythonic bindings for Tagmap<std::string,std::string>";
+  m.doc() = "tagmap: fast tagged object map";
 
   py::class_<Obj>(m, "Object")
       .def(py::init<>())
-      .def(py::init<const Data &>())
       .def(py::init<const Data &, const std::unordered_set<Tag> &>(),
            py::arg("data"), py::arg("tags"))
       .def_readwrite("data", &Obj::data)
-      .def_property(
-          "tags", [](const Obj &o) { return o.references; },
-          [](Obj &o, const std::unordered_set<Tag> &t) { o.references = t; })
-      .def("__repr__", [](const Obj &o) {
-        return "Object(data=" + o.data +
-               ", tags=" + std::to_string(o.references.size()) + ")";
-      });
+      .def_readwrite("tags", &Obj::references);
 
   py::class_<Map>(m, "TagMap")
       .def(py::init<>())
-
+      .def(py::init([](const py::dict &d) { return map_from_dict(d); }),
+           py::arg("d"))
+      .def(py::init([](const py::iterable &keys, const py::iterable &values) {
+             return map_from_keys_values(keys, values);
+           }),
+           py::arg("keys"), py::arg("values"))
+      .def(py::init(
+               [](const py::iterable &pairs) { return map_from_pairs(pairs); }),
+           py::arg("items"))
+      .def_static(
+          "from_keys_values",
+          [](const py::iterable &keys, const py::iterable &values) {
+            return map_from_keys_values(keys, values);
+          },
+          py::arg("keys"), py::arg("values"))
+      .def_static(
+          "from_dict", [](const py::dict &d) { return map_from_dict(d); },
+          py::arg("d"))
       .def("__len__", [](const Map &self) { return self.objects.size(); })
       .def("__bool__", [](const Map &self) { return !self.objects.empty(); })
-      .def("__contains__",
-           [](const Map &self, const Data &data) {
-             return has_data(self, data);
-           })
-
-      .def("__getitem__",
-           [](const Map &self, const Data &data) {
-             return get_obj_or_throw(self, data).references;
-           })
-
-      .def("__setitem__",
-           [](Map &self, const Data &data, const py::iterable &tags) {
-             set_tags(self, data, to_tagset(tags));
-           })
-
-      .def("__delitem__",
-           [](Map &self, const Data &data) {
-             if (!erase_key_if_exists(self, data))
-               throw py::key_error(data);
-           })
-
+      .def(
+          "__contains__",
+          [](const Map &self, const Data &k) { return has_data(self, k); },
+          py::arg("key"))
       .def("__iter__",
-           [](const Map &self) {
-             py::list ks;
-             ks.attr("extend")(py::cast(keys_vec(self)));
-             return ks.attr("__iter__")();
-           })
-
-      .def("__repr__",
-           [](const Map &self) {
-             return "<tagmap.TagMap size=" +
-                    std::to_string(self.objects.size()) +
-                    " tags=" + std::to_string(self.references.size()) + ">";
-           })
+           [](const Map &self) { return py::iter(py::cast(keys_vec(self))); })
+      .def(
+          "__getitem__",
+          [](const Map &self, const Data &k) {
+            return get_obj_or_throw(self, k).references;
+          },
+          py::arg("key"))
+      .def(
+          "__setitem__",
+          [](Map &self, const Data &k, const py::iterable &tags) {
+            set_tags(self, k, to_tagset(tags));
+          },
+          py::arg("key"), py::arg("tags"))
+      .def(
+          "__delitem__",
+          [](Map &self, const Data &k) { (void)erase_data_or_throw(self, k); },
+          py::arg("key"))
 
       .def("clear",
            [](Map &self) {
-             auto ks = keys_vec(self);
-             for (const auto &k : ks)
-               (void)self.erase(&k);
+             self.objects.clear();
+             self.references.clear();
            })
-
       .def("keys", [](const Map &self) { return keys_vec(self); })
       .def("values", [](const Map &self) { return values_vec(self); })
       .def("items", [](const Map &self) { return items_vec(self); })
-
-      .def("tags", [](const Map &self) { return self.listtags(); })
-      .def("data", [](const Map &self) { return keys_vec(self); })
-
+      .def("tags", [](const Map &self) { return all_tags_vec(self); })
       .def("to_dict",
            [](const Map &self) {
-             py::dict d;
+             py::dict out;
              for (const auto &kv : self.objects)
-               d[py::cast(kv.second.data)] = py::cast(kv.second.references);
-             return d;
-           })
-
-      .def_static("from_dict",
-                  [](const py::dict &d) {
-                    Map out;
-                    for (auto item : d) {
-                      Data data = py::cast<Data>(item.first);
-                      auto tags = py::cast<py::iterable>(item.second);
-                      set_tags(out, data, to_tagset(tags));
-                    }
-                    return out;
-                  })
-
-      .def("copy",
-           [](const Map &self) {
-             Map out;
-             for (const auto &kv : self.objects)
-               out.insert(kv.second.data, kv.second.references);
+               out[py::cast(kv.second.data)] = py::cast(kv.second.references);
              return out;
            })
-
       .def(
           "get",
-          [](const Map &self, const Data &data,
+          [](const Map &self, const Data &k,
              py::object default_value) -> py::object {
-            if (!has_data(self, data))
+            auto it = find_obj_it(self, k);
+            if (it == self.objects.end())
               return default_value;
-            return py::cast(get_obj_or_throw(self, data).references);
+            return py::cast(it->second.references);
           },
-          py::arg("data"), py::arg("default") = py::none())
-
+          py::arg("key"), py::arg("default") = py::none())
       .def(
           "setdefault",
-          [](Map &self, const Data &data, const py::iterable &tags) {
-            if (has_data(self, data))
-              return get_obj_or_throw(self, data).references;
-            auto t = to_tagset(tags);
-            set_tags(self, data, t);
-            return tags_of_or_empty(self, data);
+          [](Map &self, const Data &k, const py::iterable &default_tags) {
+            auto it = find_obj_it(self, k);
+            if (it != self.objects.end())
+              return it->second.references;
+            auto tags = to_tagset(default_tags);
+            set_tags(self, k, tags);
+            return tags;
           },
-          py::arg("data"), py::arg("default") = py::tuple())
-
-      .def("update",
-           [](Map &self, const py::dict &d) {
-             for (auto item : d) {
-               Data data = py::cast<Data>(item.first);
-               auto tags = py::cast<py::iterable>(item.second);
-               set_tags(self, data, to_tagset(tags));
-             }
-           })
-
-      .def(
-          "discard",
-          [](Map &self, const Data &data) {
-            (void)erase_key_if_exists(self, data);
-          },
-          py::arg("data"))
-      .def(
-          "erase",
-          [](Map &self, const Data &data) {
-            if (!erase_key_if_exists(self, data))
-              throw py::key_error(data);
-          },
-          py::arg("data"))
-
+          py::arg("key"), py::arg("default"))
       .def(
           "pop",
-          [](Map &self, const Data &data,
-             py::object default_value) -> py::object {
-            if (!has_data(self, data))
+          [](Map &self, const Data &k, py::object default_value) -> py::object {
+            auto removed = erase_data_if_exists(self, k);
+            if (!removed.has_value())
               return default_value;
-            auto t = get_obj_or_throw(self, data).references;
-            (void)self.erase(&data);
-            return py::cast(t);
+            return py::cast(removed->references);
           },
-          py::arg("data"), py::arg("default") = py::none())
-
+          py::arg("key"), py::arg("default") = py::none())
       .def("popitem",
            [](Map &self) {
              if (self.objects.empty())
                throw py::key_error("popitem(): TagMap is empty");
              auto it = self.objects.begin();
              Data k = it->second.data;
-             auto v = it->second.references;
-             (void)self.erase(&k);
-             return py::make_tuple(k, v);
+             Obj removed = self.erase(&it->second);
+             return py::make_tuple(k, removed.references);
            })
-
       .def(
-          "tags_of",
-          [](const Map &self, const Data &data) {
-            return get_obj_or_throw(self, data).references;
+          "update",
+          [](Map &self, const py::dict &d) {
+            for (auto item : d) {
+              Data key = py::cast<Data>(item.first);
+              auto tags = to_tagset(py::cast<py::iterable>(item.second));
+              set_tags(self, key, tags);
+            }
           },
-          py::arg("data"))
-
-      .def(
-          "has_tag",
-          [](const Map &self, const Data &data, const Tag &tag) {
-            if (!has_data(self, data))
-              return false;
-            const auto &t = get_obj_or_throw(self, data).references;
-            return t.find(tag) != t.end();
-          },
-          py::arg("data"), py::arg("tag"))
-
+          py::arg("d"))
       .def(
           "add_tag",
-          [](Map &self, const Data &data, const Tag &tag) {
-            auto t = tags_of_or_empty(self, data);
-            t.insert(tag);
-            set_tags(self, data, t);
+          [](Map &self, const Data &k, const Tag &t) {
+            add_tags(self, k, {t});
           },
-          py::arg("data"), py::arg("tag"))
-
+          py::arg("key"), py::arg("tag"))
       .def(
           "add_tags",
-          [](Map &self, const Data &data, const py::iterable &tags) {
-            auto t = tags_of_or_empty(self, data);
-            for (py::handle h : tags)
-              t.insert(py::cast<Tag>(h));
-            set_tags(self, data, t);
+          [](Map &self, const Data &k, const py::iterable &tags) {
+            add_tags(self, k, to_tagset(tags));
           },
-          py::arg("data"), py::arg("tags"))
-
-      .def(
-          "discard_tag",
-          [](Map &self, const Data &data, const Tag &tag) {
-            if (!has_data(self, data))
-              return;
-            auto t = get_obj_or_throw(self, data).references;
-            t.erase(tag);
-            set_tags(self, data, t);
-          },
-          py::arg("data"), py::arg("tag"))
-
+          py::arg("key"), py::arg("tags"))
       .def(
           "remove_tag",
-          [](Map &self, const Data &data, const Tag &tag) {
-            if (!has_data(self, data))
-              throw py::key_error(data);
-            auto t = get_obj_or_throw(self, data).references;
-            if (t.find(tag) == t.end())
-              throw py::key_error(tag);
-            t.erase(tag);
-            set_tags(self, data, t);
+          [](Map &self, const Data &k, const Tag &t) {
+            remove_tag_or_throw(self, k, t);
           },
-          py::arg("data"), py::arg("tag"))
-
-      .def("query",
-           [](const Map &self, py::args tags) {
-             std::unordered_set<Tag> t;
-             t.reserve(tags.size());
-             for (auto h : tags)
-               t.insert(py::cast<Tag>(h));
-             return query_all_of(self, t);
-           })
-
-      .def("query_any",
-           [](const Map &self, py::args tags) {
-             std::unordered_set<Tag> t;
-             t.reserve(tags.size());
-             for (auto h : tags)
-               t.insert(py::cast<Tag>(h));
-             return query_any_of(self, t);
-           })
-
+          py::arg("key"), py::arg("tag"))
+      .def(
+          "discard_tag",
+          [](Map &self, const Data &k, const Tag &t) {
+            discard_tag(self, k, t);
+          },
+          py::arg("key"), py::arg("tag"))
+      .def(
+          "has_tag",
+          [](const Map &self, const Data &k, const Tag &t) {
+            return has_tag(self, k, t);
+          },
+          py::arg("key"), py::arg("tag"))
       .def(
           "find",
           [](const Map &self, const py::iterable &tags) {
             return query_all_of(self, to_tagset(tags));
           },
           py::arg("tags"))
+      .def("query",
+           [](const Map &self, py::args tags) {
+             std::unordered_set<Tag> tset;
+             for (py::handle h : tags)
+               tset.insert(py::cast<Tag>(h));
+             return query_all_of(self, tset);
+           })
       .def(
           "find_any",
           [](const Map &self, const py::iterable &tags) {
             return query_any_of(self, to_tagset(tags));
           },
           py::arg("tags"))
-
+      .def("query_any",
+           [](const Map &self, py::args tags) {
+             std::unordered_set<Tag> tset;
+             for (py::handle h : tags)
+               tset.insert(py::cast<Tag>(h));
+             return query_any_of(self, tset);
+           })
       .def(
           "count",
           [](const Map &self, const py::iterable &tags) {
-            return query_all_of(self, to_tagset(tags)).size();
+            return py::int_(query_all_of(self, to_tagset(tags)).size());
           },
           py::arg("tags"))
       .def(
           "count_any",
           [](const Map &self, const py::iterable &tags) {
-            return query_any_of(self, to_tagset(tags)).size();
+            return py::int_(query_any_of(self, to_tagset(tags)).size());
           },
           py::arg("tags"))
-
+      .def(
+          "erase",
+          [](Map &self, const Data &k) {
+            return erase_data_or_throw(self, k).references;
+          },
+          py::arg("key"))
+      .def(
+          "discard",
+          [](Map &self, const Data &k) {
+            return erase_data_if_exists(self, k).has_value();
+          },
+          py::arg("key"))
       .def(
           "erase_where",
           [](Map &self, const py::iterable &tags) {
-            auto t = to_tagset(tags);
-            if (t.empty())
-              return std::unordered_set<Data>{};
-            auto removed = self.erase(t);
-            std::unordered_set<Data> out;
-            out.reserve(removed.size());
-            for (const auto &v : removed)
-              out.insert(v);
-            return out;
+            return self.erase(to_tagset(tags));
           },
           py::arg("tags"))
-
       .def(
           "retain_where",
           [](Map &self, const py::iterable &tags) {
-            return retain_where_all_of(self, to_tagset(tags));
+            const auto keep = query_all_of(self, to_tagset(tags));
+            auto ks = keys_vec(self);
+            for (const auto &k : ks)
+              if (keep.find(k) == keep.end())
+                (void)erase_data_if_exists(self, k);
+            return keep;
           },
           py::arg("tags"))
-
       .def(
           "retain_where_any",
           [](Map &self, const py::iterable &tags) {
-            return retain_where_any_of(self, to_tagset(tags));
+            const auto keep = query_any_of(self, to_tagset(tags));
+            auto ks = keys_vec(self);
+            for (const auto &k : ks)
+              if (keep.find(k) == keep.end())
+                (void)erase_data_if_exists(self, k);
+            return keep;
           },
           py::arg("tags"));
 }

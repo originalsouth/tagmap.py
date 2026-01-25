@@ -422,5 +422,63 @@ class TestEdgeCases:
         assert set(m["alice"]) == tags
 
 
+class TestConstructors:
+    """Test alternate constructors."""
+
+    def test_construct_from_dict(self):
+        """Test creating TagMap from a dictionary."""
+        d = {"alice": {"dev", "python"}, "bob": ["cpp", "dev"]}
+        m = tagmap.TagMap(d)
+        assert len(m) == 2
+        assert set(m["alice"]) == {"dev", "python"}
+        assert set(m["bob"]) == {"cpp", "dev"}
+
+    def test_construct_from_list_of_tuples(self):
+        """Test creating TagMap from a list of tuples."""
+        l = [("alice", {"dev", "python"}), ("bob", ["cpp", "dev"])]
+        m = tagmap.TagMap(l)
+        assert len(m) == 2
+        assert set(m["alice"]) == {"dev", "python"}
+        assert set(m["bob"]) == {"cpp", "dev"}
+
+    def test_construct_from_empty_dict(self):
+        """Test creating TagMap from an empty dictionary."""
+        m = tagmap.TagMap({})
+        assert len(m) == 0
+
+    def test_construct_from_empty_list(self):
+        """Test creating TagMap from an empty list."""
+        m = tagmap.TagMap([])
+        assert len(m) == 0
+
+    def test_construct_from_invalid_list_raises(self):
+        """Test that a list of non-pairs raises ValueError."""
+        with pytest.raises(TypeError):
+            tagmap.TagMap([("a", {"b"}), ("c",)])
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+class TestTagMapInitializers:
+    def test_init_from_dict_ctor(self):
+        m = tagmap.TagMap({"a": {"x", "y"}, "b": ["z"]})
+        assert set(m["a"]) == {"x", "y"}
+        assert set(m["b"]) == {"z"}
+
+    def test_init_from_pairs_ctor(self):
+        m = tagmap.TagMap([("a", ["x"]), ("b", {"y", "z"})])
+        assert set(m["a"]) == {"x"}
+        assert set(m["b"]) == {"y", "z"}
+
+    def test_init_from_keys_values_ctor(self):
+        m = tagmap.TagMap(["a", "b"], [["x"], ["y", "z"]])
+        assert set(m["a"]) == {"x"}
+        assert set(m["b"]) == {"y", "z"}
+
+    def test_init_keys_values_length_mismatch(self):
+        with pytest.raises(ValueError):
+            tagmap.TagMap(["a", "b"], [["x"]])
+
+    def test_from_keys_values_static(self):
+        m = tagmap.TagMap.from_keys_values(["a"], [["x", "y"]])
+        assert set(m["a"]) == {"x", "y"}
