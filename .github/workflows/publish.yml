@@ -7,7 +7,10 @@ on:
 
 jobs:
   build-and-publish:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,15 +24,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build twine setuptools wheel pybind11 auditwheel
+          pip install build twine setuptools wheel pybind11
+        shell: bash
+
+      - name: Install auditwheel (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: pip install auditwheel
 
       - name: Build distribution
         run: python -m build
 
-      - name: Repair wheels with auditwheel
+      - name: Repair wheels with auditwheel (Ubuntu only)
+        if: runner.os == 'Linux'
         run: |
           auditwheel repair dist/tagmap-*.whl -w dist/
-          # Remove the original non-manylinux wheel
           rm dist/tagmap-*-linux_x86_64.whl
 
       - name: Publish to PyPI
