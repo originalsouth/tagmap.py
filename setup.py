@@ -28,12 +28,14 @@ else:
     # GCC/Clang on Linux/macOS - match Makefile flags
     extra_compile_args = [
         "-std=c++20",      # C++20 standard (matches Makefile)
-        "-Ofast",          # Aggressive optimization (matches Makefile)
-        "-march=native",   # Optimize for current CPU (matches Makefile)
+        "-O3",             # Optimize for speed (compatible with universal builds)
         "-flto=auto",      # Link-time optimization (matches Makefile)
         "-DNDEBUG",        # Disable debug assertions (matches Makefile)
         "-fPIC",           # Position independent code (matches Makefile)
     ]
+    # Add -march=native only on Linux; macOS universal builds can't use it
+    if sys.platform == "linux":
+        extra_compile_args.append("-march=native")
 
 ext_modules = [
     Extension(
