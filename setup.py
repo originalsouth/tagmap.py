@@ -4,6 +4,7 @@
 from setuptools import setup, Extension
 import subprocess
 import sys
+import platform
 
 try:
     import pybind11
@@ -12,13 +13,36 @@ except ImportError:
     print("  uv pip install pybind11", file=sys.stderr)
     sys.exit(1)
 
+# Configure compiler flags based on platform and compiler
+extra_compile_args = []
+extra_link_args = []
+
+if sys.platform == "win32":
+    # MSVC compiler on Windows
+    extra_compile_args = [
+        "/std:c++latest",  # Enable latest C++ standard
+        "/O2",             # Optimize for speed
+        "/Ot",             # Favor speed over size
+    ]
+else:
+    # GCC/Clang on Linux/macOS - match Makefile flags
+    extra_compile_args = [
+        "-std=c++20",      # C++20 standard (matches Makefile)
+        "-Ofast",          # Aggressive optimization (matches Makefile)
+        "-march=native",   # Optimize for current CPU (matches Makefile)
+        "-flto=auto",      # Link-time optimization (matches Makefile)
+        "-DNDEBUG",        # Disable debug assertions (matches Makefile)
+        "-fPIC",           # Position independent code (matches Makefile)
+    ]
+
 ext_modules = [
     Extension(
         "tagmap",
         sources=["tagmap_pybind.cc"],
         include_dirs=[pybind11.get_include(), "."],
         language="c++",
-        extra_compile_args=["-std=c++20", "-Ofast"],
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
     ),
 ]
 
