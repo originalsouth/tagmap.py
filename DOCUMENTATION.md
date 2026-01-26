@@ -1,195 +1,144 @@
-# TagMap Documentation Index
+# TagMap Documentation
 
-This file provides an overview of all documentation available for the TagMap project.
+Overview of all docs for the TagMap project.
 
-## 📚 Core Documentation
+## Core Docs
 
 ### [README.md](README.md)
-**Start here!** Overview of the project, quick start guide, basic usage examples, and common use cases.
+Start here. Project overview, quick start, basic usage, and common cases.
 
 ### [docs/INSTALLATION.md](docs/INSTALLATION.md)
-Comprehensive installation guide covering:
-- Quick install via pip
-- Platform-specific instructions (macOS, Linux, Windows)
+How to get it installed:
+- pip install tagmap
+- Platform-specific notes (macOS, Linux, Windows)
 - Development setup
-- Python version support
-- Troubleshooting common issues
+- Python version requirements
+- Troubleshooting
 
 ### [docs/API.md](docs/API.md)
-Complete API reference with:
+API reference. Every method, constructor, return types, everything.
 - Constructor options
-- Item access methods
+- Item access
 - Tag operations (add, remove, check)
 - Query operations (AND/OR)
 - Count operations
-- Dictionary-like methods
+- Dictionary methods
 - Erase and retain operations
-- Type hints and return types
+- Type hints
 
 ### [docs/EXAMPLES.md](docs/EXAMPLES.md)
-Real-world usage examples:
-- Team member skills management
-- Content tagging system
-- Feature flags and deployment tracking
+Working examples:
+- Team skills management
+- Content tagging
+- Feature flags and deployments
 - Document classification
-- Conditional filtering
-- Dynamic tag updates
+- Filtering
+- Tag updates
 - Bulk operations
-- Reporting and analytics
-- Performance tips
+- Analytics
+- Performance tuning
 
 ### [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-Technical deep dive into:
+How it works under the hood:
 - Data structures and algorithms
-- Time complexity analysis
-- Query algorithms (AND/OR)
-- Memory management
+- Time complexity
+- Query algorithms
+- Memory layout
 - Python bindings (pybind11)
-- Optimization techniques
+- Optimization details
 - Design decisions
-- Performance characteristics
+- Performance metrics
 - Thread safety
-- Debugging and profiling
+- Profiling
 
 ### [CONTRIBUTING.md](CONTRIBUTING.md)
-Guide for contributing to the project:
+Contributing guidelines:
 - Development setup
-- Workflow and code style
-- Testing guidelines
-- Documentation standards
-- Common tasks (adding methods, fixing bugs)
+- Code style
+- Testing
+- Docs standards
+- Common tasks
 - Pull request process
-- Reporting issues
+- Bug reporting
 
-## 🎯 Use Cases
+## Quick Navigation
 
-Choose documentation based on your needs:
-
-| I want to... | Read |
+| Need | See |
 |---|---|
-| Install TagMap | [INSTALLATION.md](docs/INSTALLATION.md) |
-| Learn how to use it | [README.md](README.md) → [EXAMPLES.md](docs/EXAMPLES.md) |
-| Look up a method | [API.md](docs/API.md) |
-| Understand internals | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Fix a bug or add a feature | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Install | [INSTALLATION.md](docs/INSTALLATION.md) |
+| Learn usage | [README.md](README.md) + [EXAMPLES.md](docs/EXAMPLES.md) |
+| API reference | [API.md](docs/API.md) |
+| Technical details | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-## 📖 Documentation Structure
+## File Structure
 
 ```
 tagmap.py/
-├── README.md                 # Project overview & quick start
-├── DOCUMENTATION.md          # This file - documentation index
-├── CONTRIBUTING.md           # Contribution guidelines
-├── LICENSE                   # MIT License
+├── README.md                 # Start here
+├── DOCUMENTATION.md          # This file
+├── CONTRIBUTING.md           # How to contribute
+├── LICENSE                   # MIT
 ├── docs/
-│   ├── INSTALLATION.md      # Setup instructions
-│   ├── API.md               # Complete API reference
-│   ├── EXAMPLES.md          # Usage examples & patterns
-│   └── ARCHITECTURE.md      # Technical internals
-└── [source files...]
+│   ├── INSTALLATION.md      # Install instructions
+│   ├── API.md               # API reference
+│   ├── EXAMPLES.md          # Usage examples
+│   └── ARCHITECTURE.md      # Technical details
+└── [source]
 ```
 
-## 🚀 Quick Links
+## Links
 
-- **Installation**: `pip install tagmap`
-- **GitHub**: https://github.com/originalsouth/tagmap.py
-- **Issue Tracker**: https://github.com/originalsouth/tagmap.py/issues
-- **Release Notes**: https://github.com/originalsouth/tagmap.py/releases
+- Install: `pip install tagmap`
+- GitHub: https://github.com/originalsouth/tagmap.py
+- Issues: https://github.com/originalsouth/tagmap.py/issues
+- Releases: https://github.com/originalsouth/tagmap.py/releases
 
-## 📝 Common Tasks
+## Getting Started
 
-### Getting Started (5 minutes)
-1. Read [README.md](README.md) - Overview and quick start
-2. Install: `pip install tagmap`
-3. Run examples from [EXAMPLES.md](docs/EXAMPLES.md)
+1. Read [README.md](README.md)
+2. `pip install tagmap`
+3. Check [EXAMPLES.md](docs/EXAMPLES.md) for code samples
 
-### For Developers (setup)
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md) - Development setup
-2. Follow installation steps for [development](docs/INSTALLATION.md#development-installation)
-3. Run tests: `pytest test_tagmap.py -v`
+## Development Setup
 
-### API Lookup
-- Go to [API.md](docs/API.md)
-- Use browser search or editor Ctrl+F to find your method
-- See examples right there or cross-reference [EXAMPLES.md](docs/EXAMPLES.md)
-
-### Understanding Performance
-- Check [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Performance section
-- Run benchmarks: `python tagmap_bench.py`
-- Review time complexity table
-
-### Contributing Changes
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-2. Follow development workflow
-3. Add tests and documentation
-4. Submit pull request
+2. Follow [INSTALLATION.md#development-installation](docs/INSTALLATION.md#development-installation)
+3. Run: `pytest test_tagmap.py -v`
 
-## 📚 Document Relationships
+## Finding Things
 
-```
-README.md (START HERE)
-├── EXAMPLES.md (See it in action)
-├── INSTALLATION.md (Set it up)
-├── API.md (Learn all methods)
-│   └── ARCHITECTURE.md (How it works inside)
-└── CONTRIBUTING.md (Make it better)
-```
+- How do I install? → [INSTALLATION.md](docs/INSTALLATION.md)
+- How do I use it? → [README.md](README.md)
+- What methods exist? → [API.md](docs/API.md)
+- Got an example? → [EXAMPLES.md](docs/EXAMPLES.md)
+- Performance questions? → [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Want to contribute? → [CONTRIBUTING.md](CONTRIBUTING.md)
+- Build problems? → [INSTALLATION.md#troubleshooting](docs/INSTALLATION.md#troubleshooting)
 
-## 🔍 Finding What You Need
+## Documentation Coverage
 
-**How do I...?**
-- ...get started? → [README.md](README.md)
-- ...install it? → [INSTALLATION.md](docs/INSTALLATION.md)
-- ...use feature X? → [EXAMPLES.md](docs/EXAMPLES.md)
-- ...call method Y? → [API.md](docs/API.md)
-- ...optimize it? → [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- ...contribute? → [CONTRIBUTING.md](CONTRIBUTING.md)
+- Quick start in README
+- Installation for all platforms
+- Full API reference
+- Working examples
+- Architecture docs
+- Contribution guidelines
+- Performance specs
+- Troubleshooting
 
-**Troubleshooting:**
-- Installation issues? → [INSTALLATION.md#troubleshooting](docs/INSTALLATION.md#troubleshooting)
-- API questions? → [API.md](docs/API.md)
-- Performance concerns? → [ARCHITECTURE.md#performance-characteristics](docs/ARCHITECTURE.md#performance-characteristics)
-- Found a bug? → [CONTRIBUTING.md#reporting-issues](CONTRIBUTING.md#reporting-issues)
+## Keeping Docs Current
 
-## 📋 Documentation Checklist
-
-- ✅ Quick start guide in README
-- ✅ Installation instructions for all platforms
-- ✅ Complete API reference
-- ✅ Real-world usage examples
-- ✅ Architecture and design documentation
-- ✅ Contribution guidelines
-- ✅ Performance characteristics
-- ✅ Troubleshooting guides
-
-## 🔄 Keeping Documentation Updated
-
-Documentation is kept up-to-date in:
-- `README.md` - Core features, quick start
-- `docs/API.md` - Method signatures and descriptions
-- `docs/EXAMPLES.md` - Usage patterns
-- `docs/ARCHITECTURE.md` - Technical details
-- `docs/INSTALLATION.md` - Setup procedures
-- `CONTRIBUTING.md` - Development info
-
-When contributing:
-- Update relevant docs when changing features
-- Add examples for new methods
-- Keep API docs in sync with code
-- Update troubleshooting if you solve an issue
-
-## ✨ Documentation Quality
-
-All documentation includes:
-- Clear, concise explanations
-- Practical code examples
-- Links between related docs
-- Troubleshooting sections
-- Index/search-friendly format
+When making changes:
+- Update README.md for features
+- Update docs/API.md for method changes
+- Add examples to docs/EXAMPLES.md
+- Update docs/ARCHITECTURE.md for internals
+- Update docs/INSTALLATION.md for setup changes
+- Keep CONTRIBUTING.md current
 
 ---
 
-**Last Updated**: 2026-01-25
+Last Updated: 2026-01-26
 
-For the latest documentation, visit:
-https://github.com/originalsouth/tagmap.py
+Latest docs: https://github.com/originalsouth/tagmap.py

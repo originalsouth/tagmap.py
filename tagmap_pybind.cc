@@ -31,16 +31,12 @@ static inline std::unordered_set<Tag> to_tagset(const py::handle &tags) {
 }
 
 static inline ObjectsMap::iterator find_obj_it(Map &m, const Data &d) {
-  Obj probe(d);
-  const size_t key = m.getkey(probe);
-  return m.objects.find(key);
+  return m.objects.find(d);
 }
 
 static inline ObjectsMap::const_iterator find_obj_it(const Map &m,
                                                      const Data &d) {
-  Obj probe(d);
-  const size_t key = m.getkey(probe);
-  return m.objects.find(key);
+  return m.objects.find(d);
 }
 
 static inline bool has_data(const Map &m, const Data &d) {
@@ -78,7 +74,7 @@ static inline py::list keys_list(const Map &m) {
   py::list out(m.objects.size());
   size_t i = 0;
   for (const auto &kv : m.objects)
-    out[i++] = py::cast(kv.second.data);
+    out[i++] = py::cast(kv.first);
   return out;
 }
 
@@ -94,8 +90,8 @@ static inline py::list items_list(const Map &m) {
   py::list out(m.objects.size());
   size_t i = 0;
   for (const auto &kv : m.objects) {
-    out[i++] = py::make_tuple(py::cast(kv.second.data),
-                              py::cast(kv.second.references));
+    out[i++] =
+        py::make_tuple(py::cast(kv.first), py::cast(kv.second.references));
   }
   return out;
 }
@@ -109,7 +105,7 @@ static inline py::set query_all_of_py(const Map &m,
   py::set out;
   if (tags.empty()) {
     for (const auto &kv : m.objects)
-      out.add(py::cast(kv.second.data));
+      out.add(py::cast(kv.first));
     return out;
   }
   const auto ptrs = m.find(tags); // unordered_set<const Data*>
@@ -123,24 +119,20 @@ static inline py::set query_any_of_py(const Map &m,
   py::set out;
   if (tags.empty()) {
     for (const auto &kv : m.objects)
-      out.add(py::cast(kv.second.data));
+      out.add(py::cast(kv.first));
     return out;
   }
 
-  std::unordered_set<size_t> keys;
-  keys.reserve(tags.size());
-
+  std::unordered_set<const Obj *> objects;
   for (const auto &t : tags) {
     auto it = m.references.find(t);
     if (it == m.references.end())
       continue;
-    keys.insert(it->second.begin(), it->second.end());
+    objects.insert(it->second.begin(), it->second.end());
   }
 
-  for (const size_t k : keys) {
-    auto it = m.objects.find(k);
-    if (it != m.objects.end())
-      out.add(py::cast(it->second.data));
+  for (const Obj *obj : objects) {
+    out.add(py::cast(obj->data));
   }
   return out;
 }
@@ -156,15 +148,14 @@ static inline size_t count_any_of(const Map &m,
                                   const std::unordered_set<Tag> &tags) {
   if (tags.empty())
     return m.objects.size();
-  std::unordered_set<size_t> keys;
-  keys.reserve(tags.size());
+  std::unordered_set<const Obj *> objects;
   for (const auto &t : tags) {
     auto it = m.references.find(t);
     if (it == m.references.end())
       continue;
-    keys.insert(it->second.begin(), it->second.end());
+    objects.insert(it->second.begin(), it->second.end());
   }
-  return keys.size();
+  return objects.size();
 }
 
 static inline std::unordered_set<Tag> tags_of_or_empty(const Map &m,
@@ -186,7 +177,7 @@ static inline bool has_tag(const Map &m, const Data &d, const Tag &t) {
   auto it = find_obj_it(m, d);
   if (it == m.objects.end())
     return false;
-  return it->second.references.find(t) != it->second.references.end();
+  return it->second.references.count(t);
 }
 
 static inline void remove_tag_or_throw(Map &m, const Data &d, const Tag &t) {
@@ -194,10 +185,9 @@ static inline void remove_tag_or_throw(Map &m, const Data &d, const Tag &t) {
   if (it == m.objects.end())
     throw py::key_error("key not found: " + d);
   auto tags = it->second.references;
-  auto tit = tags.find(t);
-  if (tit == tags.end())
+  if (!tags.count(t))
     throw py::key_error("tag not found: " + t);
-  tags.erase(tit);
+  tags.erase(t);
   set_tags(m, d, tags);
 }
 
@@ -206,10 +196,7 @@ static inline void discard_tag(Map &m, const Data &d, const Tag &t) {
   if (it == m.objects.end())
     return;
   auto tags = it->second.references;
-  auto tit = tags.find(t);
-  if (tit == tags.end())
-    return;
-  tags.erase(tit);
+  tags.erase(t);
   set_tags(m, d, tags);
 }
 
@@ -298,6 +285,21 @@ PYBIND11_MODULE(tagmap, m) {
       .def("__iter__",
            [](const Map &self) { return py::iter(keys_list(self)); })
 
+      .def("__str__",
+           [](const Map &self) {
+             py::dict d;
+             for (const auto &kv : self.objects)
+               d[py::cast(kv.first)] = py::cast(kv.second.references);
+             return "TagMap(" + py::str(d).cast<std::string>() + ")";
+           })
+      .def("__repr__",
+           [](const Map &self) {
+             py::dict d;
+             for (const auto &kv : self.objects)
+               d[py::cast(kv.first)] = py::cast(kv.second.references);
+             return "TagMap(" + py::str(d).cast<std::string>() + ")";
+           })
+
       .def(
           "__getitem__",
           [](const Map &self, const Data &k) {
@@ -330,7 +332,7 @@ PYBIND11_MODULE(tagmap, m) {
            [](const Map &self) {
              py::dict out;
              for (const auto &kv : self.objects)
-               out[py::cast(kv.second.data)] = py::cast(kv.second.references);
+               out[py::cast(kv.first)] = py::cast(kv.second.references);
              return out;
            })
 
@@ -372,7 +374,7 @@ PYBIND11_MODULE(tagmap, m) {
              if (self.objects.empty())
                throw py::key_error("popitem(): TagMap is empty");
              auto it = self.objects.begin();
-             Data k = it->second.data;
+             Data k = it->first;
              Obj removed = self.erase(&it->second);
              return py::make_tuple(k, removed.references);
            })
@@ -470,33 +472,28 @@ PYBIND11_MODULE(tagmap, m) {
 
             const auto keep_objs =
                 self.findobject(tset); // unordered_set<const Obj*>
-            std::unordered_set<size_t> keep_keys;
-            keep_keys.reserve(keep_objs.size());
 
-            py::list kept(keep_objs.size());
+            std::unordered_set<Data> keep_data;
+            keep_data.reserve(keep_objs.size());
+            py::list kept_list(keep_objs.size());
             size_t i = 0;
-            for (const Obj *p : keep_objs) {
-              keep_keys.insert(self.getkey(*p));
-              kept[i++] = py::cast(p->data);
+            for (const Obj *obj_ptr : keep_objs) {
+              keep_data.insert(obj_ptr->data);
+              kept_list[i++] = py::cast(obj_ptr->data);
             }
 
-            std::vector<size_t> del;
-            del.reserve(self.objects.size() > keep_keys.size()
-                            ? (self.objects.size() - keep_keys.size())
-                            : 0);
-
-            for (const auto &kv : self.objects) {
-              if (!keep_keys.contains(kv.first))
-                del.push_back(kv.first);
+            std::vector<Data> to_delete_data;
+            for (auto const &[data, object] : self.objects) {
+              if (keep_data.find(data) == keep_data.end()) {
+                to_delete_data.push_back(data);
+              }
             }
 
-            for (size_t k : del) {
-              auto it = self.objects.find(k);
-              if (it != self.objects.end())
-                self.erase(&it->second);
+            for (const auto &data_to_del : to_delete_data) {
+              self.erase(&data_to_del);
             }
 
-            return kept;
+            return kept_list;
           },
           py::arg("tags"))
 
@@ -508,46 +505,36 @@ PYBIND11_MODULE(tagmap, m) {
             if (tset.empty())
               return keys_list(self);
 
-            // Build union of keys matching ANY tag
-            std::unordered_set<size_t> keep_keys;
-            keep_keys.reserve(tset.size());
-
+            // Build union of objects matching ANY tag
+            std::unordered_set<const Obj *> keep_objs;
             for (const auto &t : tset) {
               auto it = self.references.find(t);
               if (it == self.references.end())
                 continue;
-              keep_keys.insert(it->second.begin(), it->second.end());
+              keep_objs.insert(it->second.begin(), it->second.end());
             }
 
-            py::list kept(keep_keys.size());
+            py::list kept_list(keep_objs.size());
+            std::unordered_set<Data> keep_data;
+            keep_data.reserve(keep_objs.size());
             size_t i = 0;
-            for (size_t k : keep_keys) {
-              auto it = self.objects.find(k);
-              if (it != self.objects.end())
-                kept[i++] = py::cast(it->second.data);
+            for (const Obj *obj_ptr : keep_objs) {
+              keep_data.insert(obj_ptr->data);
+              kept_list[i++] = py::cast(obj_ptr->data);
             }
 
-            // If some keys were stale (shouldn't happen), shrink list
-            if (i != keep_keys.size())
-              kept = kept.attr("__getitem__")(py::slice(0, i, 1));
-
-            std::vector<size_t> del;
-            del.reserve(self.objects.size() > keep_keys.size()
-                            ? (self.objects.size() - keep_keys.size())
-                            : 0);
-
-            for (const auto &kv : self.objects) {
-              if (!keep_keys.contains(kv.first))
-                del.push_back(kv.first);
+            std::vector<Data> to_delete_data;
+            for (auto const &[data, object] : self.objects) {
+              if (keep_data.find(data) == keep_data.end()) {
+                to_delete_data.push_back(data);
+              }
             }
 
-            for (size_t k : del) {
-              auto it = self.objects.find(k);
-              if (it != self.objects.end())
-                self.erase(&it->second);
+            for (const auto &data_to_del : to_delete_data) {
+              self.erase(&data_to_del);
             }
 
-            return kept;
+            return kept_list;
           },
           py::arg("tags"))
 
@@ -566,7 +553,11 @@ PYBIND11_MODULE(tagmap, m) {
       .def(
           "erase_where",
           [](Map &self, const py::iterable &tags) {
-            return self.erase(to_tagset(tags));
+            py::list out;
+            auto erased = self.erase(to_tagset(tags));
+            for (const auto &d : erased)
+              out.append(py::cast(d));
+            return out;
           },
           py::arg("tags"));
 }

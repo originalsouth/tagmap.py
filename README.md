@@ -1,22 +1,21 @@
 # TagMap
 
-A fast, efficient data structure for managing tags and metadata in Python, built with C++ and pybind11.
+Fast dictionary-like data structure for managing tags and metadata. Built with C++ and pybind11.
 
-## Overview
+## What is This?
 
-TagMap is a specialized dictionary-like data structure optimized for managing multiple tags per key. It supports efficient queries for keys with specific tag combinations.
+TagMap is a specialized data structure optimized for managing multiple tags per key with efficient query support. Think of it as a dict where each key has a set of tags, and you can query for all keys matching specific tag combinations.
 
 ## Features
 
-- ⚡ Fast tag-based queries with intersection (all-of) and union (any-of) operations
-- 📦 Efficient tag addition and removal
-- 🔍 Multiple query methods for flexible data retrieval
-- ⚙️ Built on high-performance C++ implementation
-- 📊 Perfect for metadata management, feature flags, and classification systems
+- Fast tag queries: intersection (all-of) and union (any-of) operations
+- O(1) add/remove/check, O(n) queries
+- Efficient tag storage with optimized inverted index
+- Built on high-performance C++
+- Python bindings with pybind11
+- Handles metadata management, feature flags, classification systems
 
-## Quick Start
-
-### Installation
+## Install
 
 ```bash
 pip install tagmap
@@ -27,47 +26,44 @@ Or with uv:
 uv pip install tagmap
 ```
 
-### Basic Usage
+## Usage
 
 ```python
 import tagmap
 
-# Create a TagMap
 m = tagmap.TagMap()
 
-# Add entries with tags
+# Add keys with tags
 m["alice"] = {"dev", "python"}
 m["bob"] = {"dev", "cpp"}
 m["carol"] = ["design", "python"]
 
-# Query all entries with both "dev" and "python"
-results = m.query("dev", "python")
-# Result: ['alice']
+# Query: keys with both "dev" AND "python"
+m.query("dev", "python")          # ['alice']
 
-# Query entries with either "python" OR "ops"
-results = m.query_any("python", "ops")
-# Result: ['alice', 'carol']
+# Query: keys with "python" OR "ops"
+m.query_any("python", "ops")      # ['alice', 'carol']
 
-# Check if an entry has a tag
-has_tag = m.has_tag("alice", "python")
-# Result: True
+# Check if key has tag
+m.has_tag("alice", "python")      # True
 
-# Add/remove tags
+# Modify tags
 m.add_tag("alice", "ml")
 m.remove_tag("bob", "dev")
 ```
 
-## Documentation
+## Docs
 
-- **[Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions for all platforms
-- **[API Reference](docs/API.md)** - Complete API documentation with method signatures
-- **[Usage Examples](docs/EXAMPLES.md)** - Real-world usage patterns and examples
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - Internal design and performance characteristics
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
+- [Installation](docs/INSTALLATION.md) - Setup for all platforms
+- [API Reference](docs/API.md) - Method signatures and behavior
+- [Examples](docs/EXAMPLES.md) - Real usage patterns
+- [Architecture](docs/ARCHITECTURE.md) - Design and performance details
+- [Contributing](CONTRIBUTING.md) - How to contribute
 
-## Common Use Cases
+## Examples
 
-### Team Skills Management
+### Skills Tracking
+
 ```python
 team = tagmap.TagMap({
     "alice": ["python", "typescript", "backend"],
@@ -75,135 +71,51 @@ team = tagmap.TagMap({
     "carol": ["ux", "ui", "design"],
 })
 
-# Find all Python developers
-python_devs = team.query("python")
-
-# Find all backend developers
-backend_devs = team.query("backend")
-
-# Find people with backend + Python skills
-full_stack = team.query("python", "backend")
-```
-
-### Content Classification
-```python
-articles = tagmap.TagMap({
-    "post_1": ["python", "tutorial", "beginner"],
-    "post_2": ["python", "advanced"],
-    "post_3": ["javascript", "tutorial"],
-})
-
-# Find beginner Python tutorials
-beginners = articles.query("python", "tutorial", "beginner")
-
-# Find tutorials for learning (any level)
-tutorials = articles.query_any("tutorial")
-```
-
-### Feature Deployment Tracking
-```python
-features = tagmap.TagMap({
-    "auth_v2": ["production", "staging"],
-    "new_dashboard": ["staging", "beta"],
-    "payment": ["production"],
-})
-
-# What's in production?
-prod = features.query("production")
-
-# What's available for testing?
-testing = features.query_any("staging", "beta")
-
-# How many features are in both staging and beta?
-count = features.count(["staging", "beta"])
+team.query("python")              # ['alice']
+team.query("backend")             # ['alice', 'bob']
+team.query("python", "backend")   # ['alice']
 ```
 
 ## Performance
 
-TagMap is designed for high-performance queries on tagged data:
+Query: O(n) where n = result count. Tag ops: O(1) average. Uses optimized inverted index. Handles thousands of entries with hundreds of tags. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
-- **Query operations**: O(n) where n is the number of results
-- **Tag operations**: O(1) average time for add/remove/check
-- **Memory efficient**: Optimized inverted index for fast queries
-- **Scales well**: Handles thousands of entries with hundreds of tags
-
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed performance characteristics.
-
-## Building from Source
-
-For development or to use the latest features:
+## Building
 
 ```bash
-# Clone the repository
 git clone https://github.com/originalsouth/tagmap.py.git
 cd tagmap.py
 
-# Create virtual environment
 python -m venv venv
 source venv/bin/activate
 
-# Install dependencies
 pip install pybind11 pytest
-
-# Build and install
 pip install -e .
+# or: make
 
-# Or use the Makefile
-make
-
-# Run tests
 pytest test_tagmap.py -v
 ```
 
-Requires:
-- Python 3.8+
-- C++20 compatible compiler
-- pybind11
+Requires: Python 3.8+, C++20 compiler, pybind11
 
-### Build Methods
+Both build methods use: `-Ofast -march=native -flto=auto`
 
-Both `pip install -e .` and `make` use identical compiler optimizations:
-- **Optimization**: `-Ofast` (aggressive speed optimization)
-- **CPU-specific**: `-march=native` (optimize for your CPU)
-- **Link-time optimization**: `-flto=auto`
-- **Result**: Equivalent performance from both methods
-
-See [INSTALLATION.md](docs/INSTALLATION.md) for platform-specific build instructions.
-
-## Examples
-
-Check [EXAMPLES.md](docs/EXAMPLES.md) for comprehensive examples including:
-- Team member skills tracking
-- Blog post categorization
-- Feature deployment tracking
-- Document classification
-- Dynamic tag management
-- Bulk operations
-- Analytics and reporting
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development setup
-- Code style guidelines
-- Testing requirements
-- Pull request process
-- Reporting issues
+See [INSTALLATION.md](docs/INSTALLATION.md) for platform details.
 
 ## License
 
-TagMap is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).
 
-## Authors
+## Author
 
-- **originalsouth** - Initial implementation
+originalsouth
 
 ## Changelog
 
-See [GitHub Releases](https://github.com/originalsouth/tagmap.py/releases) for version history and release notes.
+See [GitHub Releases](https://github.com/originalsouth/tagmap.py/releases).
 
-## Support
+## Links
 
-- 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/originalsouth/tagmap.py/issues)
-- 💬 [Discussions](https://github.com/originalsouth/tagmap.py/discussions)
+- Docs: [docs/](docs/)
+- Issues: https://github.com/originalsouth/tagmap.py/issues
+- Discussions: https://github.com/originalsouth/tagmap.py/discussions
