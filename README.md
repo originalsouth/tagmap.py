@@ -1,30 +1,28 @@
 # TagMap
 
-Fast dictionary-like data structure for managing tags and metadata. Built with C++ and pybind11.
+A data structure for managing tags and metadata with support for efficient intersection and union queries. Implemented in C++ with Python bindings via pybind11.
 
-## What is This?
+## Overview
 
-TagMap is a specialized data structure optimized for managing multiple tags per key with efficient query support. Think of it as a dict where each key has a set of tags, and you can query for all keys matching specific tag combinations.
+TagMap provides a dictionary-like container where each key maps to a set of tags. It supports querying for keys that match specific tag combinations using AND (intersection) and OR (union) operations.
 
-## Features
+## Characteristics
 
-- Fast tag queries: intersection (all-of) and union (any-of) operations
-- O(1) add/remove/check, O(n) queries
-- Efficient tag storage with optimized inverted index
-- Built on high-performance C++
-- Python bindings with pybind11
-- Handles metadata management, feature flags, classification systems
+- O(1) average case for single tag operations (add, remove, check)
+- O(k·m) for AND queries (k = result size, m = avg tags per key)
+- O(n) for OR queries (n = total keys matching any tag)
+- Inverted index structure for fast queries
+- C++ implementation with Python 3.8+ compatibility
 
 ## Install
+
+Install from PyPI:
 
 ```bash
 pip install tagmap
 ```
 
-Or with uv:
-```bash
-uv pip install tagmap
-```
+Requires Python 3.8 or later. Pre-built wheels available for Linux, macOS, and Windows. For platform-specific instructions, see [INSTALLATION.md](docs/INSTALLATION.md).
 
 ## Usage
 
@@ -33,36 +31,35 @@ import tagmap
 
 m = tagmap.TagMap()
 
-# Add keys with tags
+# Set tags for keys
 m["alice"] = {"dev", "python"}
 m["bob"] = {"dev", "cpp"}
 m["carol"] = ["design", "python"]
 
 # Query: keys with both "dev" AND "python"
-m.query("dev", "python")          # ['alice']
+m.query("dev", "python")        # ['alice']
 
 # Query: keys with "python" OR "ops"
-m.query_any("python", "ops")      # ['alice', 'carol']
+m.query_any("python", "ops")    # ['alice', 'carol']
 
 # Check if key has tag
-m.has_tag("alice", "python")      # True
+m.has_tag("alice", "python")    # True
 
-# Modify tags
+# Add or remove tags
 m.add_tag("alice", "ml")
 m.remove_tag("bob", "dev")
 ```
 
-## Docs
+## Documentation
 
-- [Installation](docs/INSTALLATION.md) - Setup for all platforms
-- [API Reference](docs/API.md) - Method signatures and behavior
-- [Examples](docs/EXAMPLES.md) - Real usage patterns
-- [Architecture](docs/ARCHITECTURE.md) - Design and performance details
-- [Contributing](CONTRIBUTING.md) - How to contribute
+- [API Reference](docs/API.md) - Complete method documentation
+- [Examples](docs/EXAMPLES.md) - Usage patterns
+- [Architecture](docs/ARCHITECTURE.md) - Implementation details and complexity analysis
+- [Installation](docs/INSTALLATION.md) - Setup instructions for all platforms
 
 ## Examples
 
-### Skills Tracking
+### Team Skills
 
 ```python
 team = tagmap.TagMap({
@@ -71,16 +68,24 @@ team = tagmap.TagMap({
     "carol": ["ux", "ui", "design"],
 })
 
-team.query("python")              # ['alice']
-team.query("backend")             # ['alice', 'bob']
-team.query("python", "backend")   # ['alice']
+team.query("python")             # ['alice']
+team.query("backend")            # ['alice', 'bob']
+team.query("python", "backend")  # ['alice']
 ```
+
+See [EXAMPLES.md](docs/EXAMPLES.md) for additional usage patterns.
 
 ## Performance
 
-Query: O(n) where n = result count. Tag ops: O(1) average. Uses optimized inverted index. Handles thousands of entries with hundreds of tags. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
+Tag operations (add, remove, check): O(1) average case
+AND queries (all tags): O(k·m) where k = result size, m = avg tags per key
+OR queries (any tag): O(n) where n = sum of keys matching each tag
 
-## Building
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed complexity analysis and benchmarks.
+
+## Building from Source
+
+Clone and build:
 
 ```bash
 git clone https://github.com/originalsouth/tagmap.py.git
@@ -91,31 +96,24 @@ source venv/bin/activate
 
 pip install pybind11 pytest
 pip install -e .
-# or: make
+```
 
+Run tests:
+
+```bash
 pytest test_tagmap.py -v
 ```
 
-Requires: Python 3.8+, C++20 compiler, pybind11
+Requirements: Python 3.8+, C++20 compiler, pybind11. Build uses `-Ofast -march=native` optimizations.
 
-Both build methods use: `-Ofast -march=native -flto=auto`
-
-See [INSTALLATION.md](docs/INSTALLATION.md) for platform details.
+For detailed build instructions, see [INSTALLATION.md](docs/INSTALLATION.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE) for details.
 
-## Author
+## Repository
 
-originalsouth
-
-## Changelog
-
-See [GitHub Releases](https://github.com/originalsouth/tagmap.py/releases).
-
-## Links
-
-- Docs: [docs/](docs/)
+- GitHub: https://github.com/originalsouth/tagmap.py
 - Issues: https://github.com/originalsouth/tagmap.py/issues
-- Discussions: https://github.com/originalsouth/tagmap.py/discussions
+- Releases: https://github.com/originalsouth/tagmap.py/releases

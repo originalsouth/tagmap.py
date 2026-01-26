@@ -1,6 +1,6 @@
 # TagMap Usage Examples
 
-This document provides practical examples of using TagMap in real-world scenarios.
+Practical examples demonstrating common use cases for TagMap.
 
 ## Basic Setup
 
@@ -21,7 +21,7 @@ m["dave"] = {"ops", "devops"}
 
 ## Example 1: Team Member Skills
 
-Manage team members and their skills:
+Track team member skills and query by skill:
 
 ```python
 team = tagmap.TagMap({
@@ -31,62 +31,50 @@ team = tagmap.TagMap({
     "dave": ["devops", "kubernetes", "aws"],
 })
 
-# Find all Python developers
-python_devs = team.query("python")
-print(python_devs)  # ['alice']
+# Find team members with specific skill
+python_devs = team.query("python")        # ['alice']
+backend_devs = team.query("backend")      # ['alice', 'bob']
 
-# Find all backend developers
-backend_devs = team.query("backend")
-print(backend_devs)  # ['alice', 'bob']
+# Find people with both Python AND backend
+python_backend = team.query("python", "backend")  # ['alice']
 
-# Find people with either Python or TypeScript skills
-frontend_or_python = team.query_any("typescript", "python")
-print(frontend_or_python)  # ['alice']
+# Find people with Python OR TypeScript
+frontend_or_python = team.query_any("typescript", "python")  # ['alice']
 
-# Count backend developers
-num_backend = team.count(["backend"])
-print(num_backend)  # 2
-
-# Find someone who knows both Python and backend
-python_backend = team.query("python", "backend")
-print(python_backend)  # ['alice']
+# Count
+num_backend = team.count(["backend"])     # 2
 ```
 
 ---
 
-## Example 2: Content Tagging System
+## Example 2: Content Classification
 
-Organize blog posts with multiple tags:
+Classify and query blog posts by multiple tags:
 
 ```python
 posts = tagmap.TagMap()
 
-# Add blog posts with tags
 posts["post_1"] = ["python", "tutorial", "beginner"]
 posts["post_2"] = ["python", "advanced", "performance"]
 posts["post_3"] = ["javascript", "tutorial", "beginner"]
 posts["post_4"] = ["devops", "kubernetes", "advanced"]
 
-# Find all tutorials
-tutorials = posts.query("tutorial")
-# Result: ['post_1', 'post_3']
+# Find tutorials
+tutorials = posts.query("tutorial")                           # ['post_1', 'post_3']
 
-# Find beginner-friendly Python tutorials
-beginner_python = posts.query("python", "tutorial", "beginner")
-# Result: ['post_1']
+# Find beginner Python tutorials
+beginner_python = posts.query("python", "tutorial", "beginner")  # ['post_1']
 
-# Find posts for beginners OR intermediate
-easy_posts = posts.query_any("beginner", "intermediate")
-# Result: ['post_1', 'post_3']
+# Find beginner OR intermediate content
+easy_posts = posts.query_any("beginner", "intermediate")     # ['post_1', 'post_3']
 
 # Count advanced posts
-advanced_count = posts.count_any(["advanced"])
-# Result: 2
+advanced_count = posts.count_any(["advanced"])               # 2
 ```
 
 ---
 
-## Example 3: Feature Flags & Deployment
+## Example 3: Feature Flags
 
 Track which features are deployed to which environments:
 
@@ -98,24 +86,20 @@ features = tagmap.TagMap({
     "dark_mode": ["beta"],
 })
 
-# What's deployed to production?
-prod_features = features.query("production")
-# Result: ['auth_v2', 'payment_api']
+# Features in production
+prod_features = features.query("production")                  # ['auth_v2', 'payment_api']
 
-# What's available for testing (staging or beta)?
-testing_features = features.query_any("staging", "beta")
-# Result: ['auth_v2', 'new_dashboard', 'dark_mode']
+# Features available for testing (staging OR beta)
+testing_features = features.query_any("staging", "beta")     # ['auth_v2', 'new_dashboard', 'dark_mode']
 
-# What's in both staging AND beta? (already tested)
-well_tested = features.query("staging", "beta")
-# Result: ['auth_v2']
+# Features in both staging AND beta
+well_tested = features.query("staging", "beta")              # ['auth_v2']
 
-# Add a feature to beta
+# Add feature to beta
 features.add_tag("payment_api", "beta")
 
-# Count production features
-prod_count = features.count(["production"])
-# Result: 2
+# Count
+prod_count = features.count(["production"])                  # 2
 ```
 
 ---
@@ -127,37 +111,32 @@ Classify documents by type, sensitivity, and department:
 ```python
 docs = tagmap.TagMap()
 
-# Add documents with multiple classification tags
 docs["report_2024"] = ["financial", "confidential", "finance"]
 docs["policy_handbook"] = ["hr", "public", "general"]
 docs["source_code"] = ["technical", "proprietary", "engineering"]
 docs["public_data"] = ["data", "public", "marketing"]
 
-# Find all confidential documents
-confidential = docs.query("confidential")
-# Result: ['report_2024']
+# Find confidential documents
+confidential = docs.query("confidential")                     # ['report_2024']
 
-# Find all public documents
-public = docs.query("public")
-# Result: ['policy_handbook', 'public_data']
+# Find public documents
+public = docs.query("public")                                 # ['policy_handbook', 'public_data']
 
 # Find technical documents that are NOT public
 technical_private = [
     key for key in docs
     if "technical" in docs[key] and "public" not in docs[key]
-]
-# Result: ['source_code']
+]  # ['source_code']
 
 # Count proprietary documents
-proprietary_count = docs.count(["proprietary"])
-# Result: 1
+proprietary_count = docs.count(["proprietary"])              # 1
 ```
 
 ---
 
-## Example 5: Conditional Filtering
+## Example 5: User Filtering
 
-Filter data based on tag combinations:
+Filter users based on status and subscription:
 
 ```python
 users = tagmap.TagMap({
@@ -167,53 +146,46 @@ users = tagmap.TagMap({
     "user_4": ["free", "inactive", "unverified"],
 })
 
-# Send notification to active users
-active_users = users.query("active")
-# Result: ['user_1', 'user_2']
+# Active users
+active_users = users.query("active")                          # ['user_1', 'user_2']
 
-# Upgrade eligible users (premium AND active AND verified)
-eligible = users.query("premium", "active", "verified")
-# Result: ['user_1']
-
-# Deactivate old premium users
-old_premium = users.find_any(["premium", "old"])
+# Upgrade-eligible (premium AND active AND verified)
+eligible = users.query("premium", "active", "verified")      # ['user_1']
 
 # Remove inactive users
 users.erase_where(["inactive"])
-# Removes: ['user_3', 'user_4']
 
-# Retain only active AND premium users
+# Keep only active premium users
 kept = users.retain_where(["active", "premium"])
-# After this: only 'user_1' remains
 ```
 
 ---
 
-## Example 6: Dynamic Tag Updates
+## Example 6: Tag Management
 
-Manage tags dynamically based on events:
+Dynamically update tags based on events:
 
 ```python
 devices = tagmap.TagMap()
 
-# Register a device
+# Register device
 devices["device_001"] = ["online", "trusted"]
 
 # Device goes offline
 devices.discard_tag("device_001", "online")
 devices.add_tag("device_001", "offline")
 
-# Multiple updates
+# Add multiple tags
 devices.add_tags("device_001", ["maintenance", "quarantine"])
 
-# Check device status
+# Check status
 is_trusted = devices.has_tag("device_001", "trusted")
 is_online = devices.has_tag("device_001", "online")
 
-# Remove from quarantine after inspection
+# Remove from quarantine
 devices.discard_tag("device_001", "quarantine")
 
-# Get all devices needing maintenance
+# Find devices needing maintenance
 maintenance_devices = devices.query("maintenance")
 ```
 
@@ -221,7 +193,7 @@ maintenance_devices = devices.query("maintenance")
 
 ## Example 7: Bulk Operations
 
-Perform operations on multiple entries at once:
+Apply operations to multiple entries:
 
 ```python
 services = tagmap.TagMap({
@@ -243,17 +215,16 @@ for service in backend_v1:
     services.add_tag(service, "v2")
     services.add_tag(service, "migrated")
 
-# Remove all deprecated services
+# Remove deprecated services
 services.erase_where(["deprecated"])
 
-# Get all tags in use
+# Get all tags
 all_tags = services.tags()
-# Result: ['backend', 'critical', 'v2', 'frontend', 'migrated']
 ```
 
 ---
 
-## Example 8: Reporting & Analytics
+## Example 8: Reporting
 
 Generate reports from tagged data:
 
@@ -265,55 +236,59 @@ users = tagmap.TagMap({
     "alice": ["premium", "inactive", "eu"],
 })
 
-# Generate report
+# Summary
 print(f"Total users: {len(users)}")
 print(f"Premium users: {users.count(['premium'])}")
 print(f"Active users: {users.count(['active'])}")
 print(f"US-based users: {users.count(['us'])}")
 print(f"Active premium users: {users.count(['active', 'premium'])}")
 
-# Segment analysis
+# Segment by region
 regions = {
     "us": users.query("us"),
     "uk": users.query("uk"),
     "eu": users.query("eu"),
 }
 
+# Segment by status
 status = {
     "active": users.query("active"),
     "inactive": users.query("inactive"),
 }
-
-# Create a report
-for region, users_in_region in regions.items():
-    print(f"\n{region.upper()} ({len(users_in_region)} users):")
-    for user in users_in_region:
-        print(f"  {user}: {users[user]}")
 ```
 
 ---
 
 ## Performance Tips
 
+Use TagMap methods for efficient querying:
+
 ```python
-# Prefer query() over filtering in Python
-# FAST ✓
+# Efficient: use built-in query
 results = m.query("dev", "python")
 
-# SLOW ✗
+# Less efficient: filter in Python
 results = [k for k, v in m.items() if "dev" in v and "python" in v]
+```
 
-# Batch operations are efficient
-m.add_tags("alice", ["tag1", "tag2", "tag3"])  # Single operation
+Batch tag operations:
 
-# Use count() for counting instead of len(query())
-# FAST ✓
+```python
+# Efficient: single operation
+m.add_tags("alice", ["tag1", "tag2", "tag3"])
+
+# Less efficient: multiple operations
+m.add_tag("alice", "tag1")
+m.add_tag("alice", "tag2")
+m.add_tag("alice", "tag3")
+```
+
+Use `count()` instead of `len(query())`:
+
+```python
+# Efficient
 count = m.count(["dev"])
 
-# SLOW ✗
+# Less efficient
 count = len(m.query("dev"))
-
-# Update TagMap once if making multiple changes to the same entry
-m["alice"] = {"tag1", "tag2"}  # Replaces all tags
-m.add_tag("alice", "tag3")  # Adds one tag
 ```
