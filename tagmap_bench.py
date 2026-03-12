@@ -1,12 +1,18 @@
 #!/usr/bin/env python
-import os
-import time
+from __future__ import annotations
+
 import random
 import statistics as stats
+import sys
+import time
+from collections.abc import Callable
+
 import tagmap
 
 
-def bench(name, fn, repeats=5, warmup=1):
+def bench(
+    name: str, fn: Callable[[], object], repeats: int = 5, warmup: int = 1
+) -> dict[str, object]:
     for _ in range(warmup):
         fn()
     times = []
@@ -27,7 +33,7 @@ def bench(name, fn, repeats=5, warmup=1):
     }
 
 
-def pct(x, p):
+def pct(x: list[float], p: float) -> float | None:
     if not x:
         return None
     x = sorted(x)
@@ -36,15 +42,15 @@ def pct(x, p):
 
 
 def run_stress(
-    n_objects=200_000,
-    n_tags=2_000,
-    tags_per_obj=6,
-    n_queries=50_000,
-    query_k=2,
-    query_any_ratio=0.5,
-    erase_ratio=0.05,
-    seed=1,
-):
+    n_objects: int = 200_000,
+    n_tags: int = 2_000,
+    tags_per_obj: int = 6,
+    n_queries: int = 50_000,
+    query_k: int = 2,
+    query_any_ratio: float = 0.5,
+    erase_ratio: float = 0.05,
+    seed: int = 1,
+) -> None:
     random.seed(seed)
 
     tags = [f"t{i}" for i in range(n_tags)]
@@ -135,7 +141,7 @@ def run_stress(
         }
     )
 
-    print(f"Python {os.sys.version.split()[0]}")
+    print(f"Python {sys.version.split()[0]}")
     print(
         f"Objects={n_objects:,} Tags={n_tags:,} Tags/obj={tags_per_obj} Queries={n_queries:,} k={query_k}"
     )
